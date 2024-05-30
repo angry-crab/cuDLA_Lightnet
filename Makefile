@@ -52,7 +52,8 @@ INCLUDES += -I $(CUDA_PATH)/include \
             -I $(OPENCV_INCLUDE_PATH) \
             -I /usr/include/jsoncpp/ \
 			-I /usr/include \
-			-I /home/autoware/develop/nvsci_headers
+			-I /home/autoware/develop/nvsci_headers \
+			-I /home/autoware/develop/cuDLA_Lightnet/include
 LIBRARIES += -l cudla -L$(CUDA_PATH)/lib64 \
              -l cuda -l cudart -l nvinfer \
              -L $(OPENCV_LIB_PATH) \

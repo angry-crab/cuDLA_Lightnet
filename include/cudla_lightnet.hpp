@@ -13,6 +13,45 @@
 
 #include "cudla_context_standalone.h"
 
+/**
+ * Configuration settings related to the model being used for inference.
+ * Includes paths, classification thresholds, and anchor configurations.
+ */
+struct ModelConfig {
+  std::string model_path; ///< Path to the serialized model file.
+  int num_class; ///< Number of classes the model can identify.
+  float score_threshold; ///< Threshold for classification scores to consider a detection valid.
+  std::vector<int> anchors; ///< Anchor sizes for the model.
+  int num_anchors; ///< Number of anchors.
+  float nms_threshold; ///< Threshold for Non-Maximum Suppression (NMS).  
+};
+
+/**
+ * Configuration settings for performing inference, including precision and
+ * hardware-specific options.
+ */
+struct InferenceConfig {
+  std::string precision; ///< Precision mode for inference (e.g., FP32, FP16).
+  bool profile; ///< Flag to enable profiling to measure inference performance.
+  bool sparse; ///< Flag to enable sparsity in the model, if supported.
+  int dla_core_id; ///< ID of the DLA core to use for inference, if applicable.
+  bool use_first_layer; ///< Flag to use the first layer in calculations, typically for INT8 calibration.
+  bool use_last_layer; ///< Flag to use the last layer in calculations, affecting performance and accuracy.
+  int batch_size; ///< Number of images processed in one inference batch.
+  double scale; ///< Scale factor for input image normalization.
+  size_t workspace_size; ///< Maximum workspace size for TensorRT.
+};
+/**
+ * Configuration for visualization settings, including whether to show output
+ * and how to colorize different aspects of the output.
+ */
+struct VisualizationConfig {
+  bool dont_show; ///< Flag indicating whether to suppress displaying the output window.
+  std::vector<std::vector<int>> colormap; ///< Color mapping for classes in bounding boxes.
+  std::vector<std::string> names; ///< Names of the classes for display.
+  std::vector<std::vector<int>> argmax2bgr; ///< Mapping from class indices to BGR colors for segmentation masks.
+};
+
 namespace cudla_lightnet
 {
 
@@ -80,8 +119,6 @@ public:
 
   void pushImg(void *imgBuffer, int numImg, bool fromCPU);
 
-  void infer();
-
   void copyHalf2Float(std::vector<float>& out_float, int binding_idx);
 
   void makeBbox(const int imageH, const int imageW);
@@ -99,7 +136,7 @@ public:
   
   std::vector<BBoxInfo> nonMaximumSuppression(const float nmsThresh, std::vector<BBoxInfo> binfo);
 
-  void makeMask(std::vector<cv::Vec3b> &argmax2bgr);
+  void makeMask(std::vector<std::vector<int>> &argmax2bgr);
 
   void makeDepthmap();
 

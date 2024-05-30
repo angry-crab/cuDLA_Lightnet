@@ -9,6 +9,20 @@ T CLAMP(const T& value, const T& low, const T& high)
 return value < low ? low : (value > high ? high : value);
 }
 
+static void convert_float_to_half(float * a, __half * b, int size) {
+    for(int i=0; i<size; ++i)
+    {
+        b[i] = __float2half(a[i]);
+    }
+}
+
+static void convert_half_to_float(__half * a, float * b, int size) {
+    for(int i=0; i<size; ++i)
+    {
+        b[i] = __half2float(a[i]);
+    }
+}
+
 static void convert_float_to_int8(const float* a, int8_t* b, int size, float scale) {
     for(int idx=0; idx<size; ++idx)
     {
@@ -83,9 +97,9 @@ Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config,
     std::cout << "output_1 size : " << mCuDLACtx->getOutputTensorSizeWithIndex(1) << std::endl;
     std::cout << "output_2 size : " << mCuDLACtx->getOutputTensorSizeWithIndex(2) << std::endl;
 
-    std::vector<void *> cudla_inputs{input_buf};
-    std::vector<void *> cudla_outputs{output_buf_0, output_buf_1, output_buf_2};
-    mCuDLACtx->initTask(cudla_inputs, cudla_outputs);
+    // std::vector<void *> cudla_inputs{input_buf};
+    // std::vector<void *> cudla_outputs{output_buf_0, output_buf_1, output_buf_2};
+    // mCuDLACtx->initTask(cudla_inputs, cudla_outputs);
 
     mBindingArray.push_back(reinterpret_cast<void *>(input_buf));
     mBindingArray.push_back(output_buf_0);
@@ -99,17 +113,17 @@ Lightnet::~Lightnet()
 {
     delete mCuDLACtx;
     mCuDLACtx = nullptr;
-    cudaStreamDestroy(*mStream);
+    cudaStreamDestroy(mStream);
     // float sum = std::accumulate(time_.begin(), time_.end(), 0);
     // std::cout << "avg infer time : " << sum/time_.size() << std::endl;
 }
 
-Lightnet::preprocess(const std::vector<cv::Mat> &images)
+void Lightnet::preprocess(const std::vector<cv::Mat> &images)
 {
-    scales_.clear();
+    // scales_.clear();
     input_h_.clear();
-    const float inputH = static_cast<float>(input_dims.d[2]);
-    const float inputW = static_cast<float>(input_dims.d[3]);
+    const float inputH = static_cast<float>(input_dims[2]);
+    const float inputW = static_cast<float>(input_dims[3]);
 
     // Normalize images and convert to blob directly without additional copying.
     float scale = 1 / 255.0;
@@ -124,13 +138,13 @@ void Lightnet::pushImg(void *imgBuffer, int numImg, bool fromCPU)
 {
     int dim = input_dims[0] * input_dims[1] * input_dims[2] * input_dims[3];
 
-    if (mBackend == YoloxpBackend::CUDLA_FP16)
+    if (mBackend == LightnetBackend::CUDLA_FP16)
     {
-        std::vector<__half> tmp_fp(dim);
-        convert_float_to_half((float *)imgBuffer, tmp_fp.data(), dim);
-        checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice));
+        // std::vector<__half> tmp_fp(dim);
+        // convert_float_to_half((float *)imgBuffer, tmp_fp.data(), dim);
+        // checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice));
     }
-    if (mBackend == YoloxpBackend::CUDLA_INT8)
+    if (mBackend == LightnetBackend::CUDLA_INT8)
     {
         std::vector<int8_t> tmp_int(dim);
         convert_float_to_int8((float *)imgBuffer, tmp_int.data(), dim, mInputScale);
@@ -192,7 +206,7 @@ void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
     convert_half_to_float((__half *)fp_0.data(), (float *)out_float.data(), dim_0);
 }
 
-void Lightnet::makeBbox()
+void Lightnet::makeBbox(const int imageH, const int imageW)
 {
     bbox_.clear();
     int inputW = input_dims[3];
@@ -387,7 +401,7 @@ std::vector<BBoxInfo> Lightnet::nonMaximumSuppression(const float nmsThresh, std
     return out;
 }
 
-void Lightnet::makeMask(std::vector<cv::Vec3b> &argmax2bgr)
+void Lightnet::makeMask(std::vector<std::vector<int>> &argmax2bgr)
 {
     masks_.clear();
     // Formula to identify output tensors not related to bounding box detections.

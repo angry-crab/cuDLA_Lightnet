@@ -86,46 +86,7 @@ void saveBoxPred(std::vector<std::string>& map2class, std::vector<std::vector<fl
     return;
 }
 
-/**
- * Configuration settings related to the model being used for inference.
- * Includes paths, classification thresholds, and anchor configurations.
- */
-struct ModelConfig {
-  std::string model_path; ///< Path to the serialized model file.
-  int num_class; ///< Number of classes the model can identify.
-  float score_threshold; ///< Threshold for classification scores to consider a detection valid.
-  std::vector<int> anchors; ///< Anchor sizes for the model.
-  int num_anchors; ///< Number of anchors.
-  float nms_threshold; ///< Threshold for Non-Maximum Suppression (NMS).  
-};
-
-/**
- * Configuration settings for performing inference, including precision and
- * hardware-specific options.
- */
-struct InferenceConfig {
-  std::string precision; ///< Precision mode for inference (e.g., FP32, FP16).
-  bool profile; ///< Flag to enable profiling to measure inference performance.
-  bool sparse; ///< Flag to enable sparsity in the model, if supported.
-  int dla_core_id; ///< ID of the DLA core to use for inference, if applicable.
-  bool use_first_layer; ///< Flag to use the first layer in calculations, typically for INT8 calibration.
-  bool use_last_layer; ///< Flag to use the last layer in calculations, affecting performance and accuracy.
-  int batch_size; ///< Number of images processed in one inference batch.
-  double scale; ///< Scale factor for input image normalization.
-  size_t workspace_size; ///< Maximum workspace size for TensorRT.
-};
-/**
- * Configuration for visualization settings, including whether to show output
- * and how to colorize different aspects of the output.
- */
-struct VisualizationConfig {
-  bool dont_show; ///< Flag indicating whether to suppress displaying the output window.
-  std::vector<std::vector<int>> colormap; ///< Color mapping for classes in bounding boxes.
-  std::vector<std::string> names; ///< Names of the classes for display.
-  std::vector<std::vector<int>> argmax2bgr; ///< Mapping from class indices to BGR colors for segmentation masks.
-};
-
-void infer(cudla_lightnet::Lightnet &net, std::vector<cv::Mat> &images, std::vector<cv::Vec3b> &argmax2bgr)
+void infer(cudla_lightnet::Lightnet &net, std::vector<cv::Mat> &images, std::vector<std::vector<int>> &argmax2bgr)
 {
     net.preprocess(images);
     net.infer();
@@ -144,7 +105,7 @@ void infer(cudla_lightnet::Lightnet &net, std::vector<cv::Mat> &images, std::vec
  */
 void drawLightNet(cudla_lightnet::Lightnet &net, cv::Mat &image, std::vector<std::vector<int>> &colormap, std::vector<std::string> &names)
 {
-  std::vector<tensorrt_lightnet::BBoxInfo> bbox = net.getBbox();  
+  std::vector<cudla_lightnet::BBoxInfo> bbox = net.getBbox();  
   std::vector<cv::Mat> masks = net.getMask();
   std::vector<cv::Mat> depthmaps = net.getDepthmap();
   
@@ -162,7 +123,7 @@ void drawLightNet(cudla_lightnet::Lightnet &net, cv::Mat &image, std::vector<std
   net.drawBbox(image, bbox, colormap, names);
 }
 
-int main()
+int main(int argc, char **argv)
 {
     InputParser input(argc, argv);
     if (input.cmdOptionExists("-h"))
@@ -187,16 +148,11 @@ int main()
                                         {128,255,0}, {255,255,0}, {255,0,32}, {255,0,0}, {0,255,0}, {100,100,100}};
     std::vector<std::string> map2class{"UNKNOWN", "CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN", "ANIMAL", "??", "!!"};
 
-    LightNetBackend backend = LightNetBackend::CUDLA_FP16;
+    cudla_lightnet::LightnetBackend backend = cudla_lightnet::LightnetBackend::CUDLA_FP16;
     if (backend_str == "cudla_int8")
     {
-        backend = LightNetBackend::CUDLA_INT8;
+        backend = cudla_lightnet::LightnetBackend::CUDLA_INT8;
     }
-
-    cudla_lightnet::Lightnet lightnet_infer(engine_path, backend);
-
-    std::vector<cv::Mat>            bgr_imgs;
-    std::vector<std::vector<float>> results;
 
     ModelConfig model_config{engine_path, 10, 0.2, {10,14,22,22,15,49,35,36,56,52,38,106,92,73,114,118,102,264,201,143,272,232,415,278,274,476,522,616,968,730},
         5, 0.45f};
@@ -206,6 +162,11 @@ int main()
     VisualizationConfig visualization_config = {false,
         color_map, map2class,
         color_map};
+
+    cudla_lightnet::Lightnet lightnet_infer(model_config, inference_config, engine_path, backend);
+
+    std::vector<cv::Mat>            bgr_imgs;
+    std::vector<std::vector<float>> results;
     
     if (!image_path.empty())
     {
