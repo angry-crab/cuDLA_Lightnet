@@ -160,9 +160,10 @@ public:
 
   std::vector<float> input_h_;
 
-  std::vector<float> output_h0_;
-  std::vector<float> output_h1_;
-  std::vector<float> output_h2_;
+  // std::vector<float> output_h0_;
+  // std::vector<float> output_h1_;
+  // std::vector<float> output_h2_;
+  std::vector<std::vector<float>> output_h_;
 
   std::vector<int> input_dims{1, 3, 960, 960};
   std::vector<int> output_dims_0{1, 75, 30, 30};

@@ -154,6 +154,7 @@ void Lightnet::pushImg(void *imgBuffer, int numImg, bool fromCPU)
 
 void Lightnet::infer()
 {
+    output_h_.clear();
     // output_h0_ = std::vector<float>(output_dims_0[0]*output_dims_0[1]*output_dims_0[2]*output_dims_0[3]);
     // output_h1_ = std::vector<float>(output_dims_1[0]*output_dims_1[1]*output_dims_1[2]*output_dims_1[3]);
     // output_h2_ = std::vector<float>(output_dims_2[0]*output_dims_2[1]*output_dims_2[2]*output_dims_2[3]);
@@ -192,9 +193,12 @@ void Lightnet::infer()
     std::vector<float> fp_2(dim3_2 * output_dims_2[3], 0);
     reformat(fp_2_float, fp_2, output_dims_2, mByte);
     
-    output_h0_ = fp_0;
-    output_h1_ = fp_1;
-    output_h2_ = fp_2;
+    // output_h0_ = fp_0;
+    // output_h1_ = fp_1;
+    // output_h2_ = fp_2;
+    output_h_.push(fp_0);
+    output_h_.push(fp_1);
+    output_h_.push(fp_2);
 }
 
 void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
@@ -214,17 +218,16 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
     // Channel size formula to identify relevant tensor outputs for bounding boxes.
     int chan_size = (4 + 1 + num_class_) * num_anchor_;
     int detection_count = 0;
-    for (int i = 0; i < trt_common_->getNbBindings(); i++) {
-        if (trt_common_->bindingIsInput(i)) {
-            continue;
-        }
-        const auto dims = trt_common_->getBindingDimensions(i);
-        int gridW = dims.d[3];
-        int gridH = dims.d[2];
-        int chan = dims.d[1];
+    std::vector<std::vector<int>> dims{output_dims_0, output_dims_1, output_dims_2};
+    for (int i = 1; i < mBindingArray.size(); i++) {
+        auto dim = dims[i-1];
+        int gridW = dim[3];
+        int gridH = dim[2];
+        int chan = dim[1];
 
         if (chan_size == chan)
         { // Filtering out the tensors that match the channel size for detections.
+            std::cout << "output binding " + std::to_string(i) << std::endl;
             std::vector<BBoxInfo> b = decodeTensor(0, imageH, imageW, inputH, inputW, &(anchors_[num_anchor_ * (detection_count) * 2]), num_anchor_, output_h_.at(i-1).get(), gridW, gridH);
             bbox_.insert(bbox_.end(), b.begin(), b.end());
             detection_count++;
