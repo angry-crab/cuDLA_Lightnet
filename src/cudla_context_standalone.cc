@@ -515,6 +515,24 @@ cuDLAContextStandalone::~cuDLAContextStandalone()
     m_LoadableData = nullptr;
 }
 
+std::vector<int> cuDLAContextStandalone::getInputTensorDims(int32_t index)
+{
+    int n = m_InputsBufContext[index].cudla_tensor_desc->n;
+    int c = m_InputsBufContext[index].cudla_tensor_desc->c;
+    int h = m_InputsBufContext[index].cudla_tensor_desc->h;
+    int w = m_InputsBufContext[index].cudla_tensor_desc->w;
+    return std::vector<int>{n, c, h, w};
+}
+
+std::vector<int> cuDLAContextStandalone::getOutputTensorDims(int32_t index)
+{
+    int n = m_OutputsBufContext[index].cudla_tensor_desc->n;
+    int c = m_OutputsBufContext[index].cudla_tensor_desc->c;
+    int h = m_OutputsBufContext[index].cudla_tensor_desc->h;
+    int w = m_OutputsBufContext[index].cudla_tensor_desc->w;
+    return std::vector<int>{n, c, h, w};
+}
+
 void *cuDLAContextStandalone::getInputCpuBufferPtr(int32_t index)
 {
     if(index >= m_InputsBufContext.size())

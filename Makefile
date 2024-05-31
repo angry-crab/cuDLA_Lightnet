@@ -50,7 +50,6 @@ OPENCV_LIB_PATH ?= /usr/lib/aarch64-linux-gnu/
 
 INCLUDES += -I $(CUDA_PATH)/include \
             -I $(OPENCV_INCLUDE_PATH) \
-            -I /usr/include/jsoncpp/ \
 			-I /usr/include \
 			-I /home/autoware/develop/nvsci_headers \
 			-I /home/autoware/develop/cuDLA_Lightnet/include
@@ -59,7 +58,6 @@ LIBRARIES += -l cudla -L$(CUDA_PATH)/lib64 \
              -L $(OPENCV_LIB_PATH) \
 			 -l pthread \
 	         -l opencv_objdetect -l opencv_highgui -l opencv_imgproc -l opencv_core -l opencv_imgcodecs -l opencv_dnn \
-             -l jsoncpp \
 			 -L /usr/lib/aarch64-linux-gnu/nvidia/ -lnvscibuf \
 			 -L /usr/lib/aarch64-linux-gnu/nvidia/ -lnvscisync
 
@@ -80,8 +78,8 @@ $(BUILD_DIR)/%.o: $(SRCDIR)/%.cu | $(BUILD_DIR)
 cudla_lightnet: $(NVCCOBJS) $(CXXOBJS) | $(BUILD_DIR)
 	$(CXX) $(ALL_CCFLAGS) $(INCLUDES) $(ALL_LDFLAGS) -o $(BUILD_DIR)/$@ $+ $(LIBRARIES)
 
-run_int8: cudla_lightnet
-	./$(BUILD_DIR)/cudla_lightnet --engine ./data/loadable/yoloxp.int8.int8chwin.fp16chwout.standalone.bin --image /home/autoware/develop/cudla_dev/data/evaluation_dataset_v1/JPEGImages --backend cudla_int8
+run: cudla_lightnet
+	./$(BUILD_DIR)/cudla_lightnet --engine0 ./model/loadable/lightnet.int8.fp16chwin.fp16chwout.standalone.bin --engine1 ./model/loadable/lightnet_320.int8.fp16chwin.fp16chwout.standalone.bin --image /home/autoware/develop/cuDLA_Lightnet/data --backend cudla_fp16
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

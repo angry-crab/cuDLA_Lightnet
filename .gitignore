@@ -1,4 +1,6 @@
-build
-model
-data/results
+build/*
+model/*
+data/*
 .vscode
+results/*
+video/*

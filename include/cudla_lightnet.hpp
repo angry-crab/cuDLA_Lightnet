@@ -148,6 +148,12 @@ public:
 
   std::vector<cv::Mat> getMask();
 
+  void clearSubnetBbox();
+
+  void appendSubnetBbox(std::vector<BBoxInfo> bb);
+
+  std::vector<BBoxInfo> getSubnetBbox();
+
   cudaStream_t mStream;
 
   cuDLAContextStandalone *mCuDLACtx;
@@ -165,16 +171,28 @@ public:
   // std::vector<float> output_h2_;
   std::vector<std::vector<float>> output_h_;
 
-  std::vector<int> input_dims{1, 3, 960, 960};
-  std::vector<int> output_dims_0{1, 75, 30, 30};
-  std::vector<int> output_dims_1{1, 75, 60, 60};
-  std::vector<int> output_dims_2{1, 75, 120, 120};
+  std::vector<int> input_dims;
+  std::vector<int> output_dims_0;
+  std::vector<int> output_dims_1;
+  std::vector<int> output_dims_2;
+
+  // std::vector<int> input_dims{1, 3, 960, 960};
+  // std::vector<int> output_dims_0{1, 75, 120, 120};
+  // std::vector<int> output_dims_1{1, 75, 60, 60};
+  // std::vector<int> output_dims_2{1, 75, 30, 30};
+
+  // std::vector<int> input_dims_sub{1, 3, 320, 320};
+  // std::vector<int> output_dims_sub_0{1, 21, 40, 40};
+  // std::vector<int> output_dims_sub_1{1, 21, 20, 20};
+  // std::vector<int> output_dims_sub_2{1, 21, 10, 10};
 
   // Output : 2 for fp16, 1 for in8
   int mByte = 2;
 
   // mInputScale is obtained from calibration file
   float mInputScale   = 2.00787;
+  // float mInputScale   = 0.0179921;
+  
 
   /**
    * Number of classes that the model is trained to predict.

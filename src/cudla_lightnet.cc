@@ -44,7 +44,6 @@ static void reformat(std::vector<float>& input, std::vector<float>& output, std:
 {
     std::size_t step_i = roundup(dim_i.back(), byte);
     std::size_t step_o = static_cast<std::size_t>(dim_i.back());
-    // std::cout << "step_i : " << step_i << std::endl;
     for(std::size_t pi=0, po=0; pi<input.size(); pi+=step_i, po+=step_o)
     {
         std::memcpy((void*)&output[po], (void*)&input[pi], dim_i.back()*sizeof(float));
@@ -93,20 +92,15 @@ Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config,
     output_buf_1 = mCuDLACtx->getOutputCudaBufferPtr(1);
     output_buf_2 = mCuDLACtx->getOutputCudaBufferPtr(2);
 
-    std::cout << "output_0 size : " << mCuDLACtx->getOutputTensorSizeWithIndex(0) << std::endl;
-    std::cout << "output_1 size : " << mCuDLACtx->getOutputTensorSizeWithIndex(1) << std::endl;
-    std::cout << "output_2 size : " << mCuDLACtx->getOutputTensorSizeWithIndex(2) << std::endl;
-
-    // std::vector<void *> cudla_inputs{input_buf};
-    // std::vector<void *> cudla_outputs{output_buf_0, output_buf_1, output_buf_2};
-    // mCuDLACtx->initTask(cudla_inputs, cudla_outputs);
-
     mBindingArray.push_back(reinterpret_cast<void *>(input_buf));
     mBindingArray.push_back(output_buf_0);
     mBindingArray.push_back(output_buf_1);
     mBindingArray.push_back(output_buf_2);
 
-    
+    input_dims = mCuDLACtx->getInputTensorDims(0);
+    output_dims_0 = mCuDLACtx->getOutputTensorDims(0);
+    output_dims_1 = mCuDLACtx->getOutputTensorDims(1);
+    output_dims_2 = mCuDLACtx->getOutputTensorDims(2);
 }
 
 Lightnet::~Lightnet()
@@ -140,9 +134,9 @@ void Lightnet::pushImg(void *imgBuffer, int numImg, bool fromCPU)
 
     if (mBackend == LightnetBackend::CUDLA_FP16)
     {
-        // std::vector<__half> tmp_fp(dim);
-        // convert_float_to_half((float *)imgBuffer, tmp_fp.data(), dim);
-        // checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice));
+        std::vector<__half> tmp_fp(dim);
+        convert_float_to_half((float *)imgBuffer, tmp_fp.data(), dim);
+        checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice));
     }
     if (mBackend == LightnetBackend::CUDLA_INT8)
     {
@@ -155,9 +149,6 @@ void Lightnet::pushImg(void *imgBuffer, int numImg, bool fromCPU)
 void Lightnet::infer()
 {
     output_h_.clear();
-    // output_h0_ = std::vector<float>(output_dims_0[0]*output_dims_0[1]*output_dims_0[2]*output_dims_0[3]);
-    // output_h1_ = std::vector<float>(output_dims_1[0]*output_dims_1[1]*output_dims_1[2]*output_dims_1[3]);
-    // output_h2_ = std::vector<float>(output_dims_2[0]*output_dims_2[1]*output_dims_2[2]*output_dims_2[3]);
 
     // TODO: find another way to sync device
     checkCudaErrors(cudaDeviceSynchronize());
@@ -193,12 +184,9 @@ void Lightnet::infer()
     std::vector<float> fp_2(dim3_2 * output_dims_2[3], 0);
     reformat(fp_2_float, fp_2, output_dims_2, mByte);
     
-    // output_h0_ = fp_0;
-    // output_h1_ = fp_1;
-    // output_h2_ = fp_2;
-    output_h_.push(fp_0);
-    output_h_.push(fp_1);
-    output_h_.push(fp_2);
+    output_h_.push_back(fp_0);
+    output_h_.push_back(fp_1);
+    output_h_.push_back(fp_2);
 }
 
 void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
@@ -219,21 +207,19 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
     int chan_size = (4 + 1 + num_class_) * num_anchor_;
     int detection_count = 0;
     std::vector<std::vector<int>> dims{output_dims_0, output_dims_1, output_dims_2};
-    for (int i = 1; i < mBindingArray.size(); i++) {
-        auto dim = dims[i-1];
+    for (int i = 0; i < output_h_.size(); i++) {
+        auto dim = dims[i];
         int gridW = dim[3];
         int gridH = dim[2];
         int chan = dim[1];
 
         if (chan_size == chan)
         { // Filtering out the tensors that match the channel size for detections.
-            std::cout << "output binding " + std::to_string(i) << std::endl;
-            std::vector<BBoxInfo> b = decodeTensor(0, imageH, imageW, inputH, inputW, &(anchors_[num_anchor_ * (detection_count) * 2]), num_anchor_, output_h_.at(i-1).get(), gridW, gridH);
+            std::vector<BBoxInfo> b = decodeTensor(0, imageH, imageW, inputH, inputW, &(anchors_[num_anchor_ * (detection_count) * 2]), num_anchor_, output_h_[i].data(), gridW, gridH);
             bbox_.insert(bbox_.end(), b.begin(), b.end());
             detection_count++;
         }
     }
-
     bbox_ = nonMaximumSuppression(nms_threshold_, bbox_); // Apply NMS and return the filtered bounding boxes.
     //    bbox_ = nmsAllClasses(nms_threshold_, bbox_, num_class_); // Apply NMS and return the filtered bounding boxes.   
 }
@@ -493,6 +479,21 @@ std::vector<cv::Mat> Lightnet::getDepthmap()
 std::vector<cv::Mat> Lightnet::getMask()
 {
     return masks_;
+}
+
+void Lightnet::clearSubnetBbox()
+{
+    subnet_bbox_.clear();
+}
+
+void Lightnet::appendSubnetBbox(std::vector<BBoxInfo> bb)    
+{
+    subnet_bbox_.insert(subnet_bbox_.end(), bb.begin(), bb.end());
+}
+
+std::vector<BBoxInfo> Lightnet::getSubnetBbox()
+{
+    return subnet_bbox_;
 }
 
 void Lightnet::drawBbox(cv::Mat &img, std::vector<BBoxInfo> bboxes, std::vector<std::vector<int>> &colormap, std::vector<std::string> names)

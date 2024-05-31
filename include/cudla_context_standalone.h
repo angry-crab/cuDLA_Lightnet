@@ -112,6 +112,10 @@ class cuDLAContextStandalone
     //!
     int submitDLATask(cudaStream_t streamToRun);
 
+    std::vector<int> getInputTensorDims(int32_t index);
+
+    std::vector<int> getOutputTensorDims(int32_t index);
+
     void *getInputCpuBufferPtr(int32_t index);
 
     void *getOutputCpuBufferPtr(int32_t index);
