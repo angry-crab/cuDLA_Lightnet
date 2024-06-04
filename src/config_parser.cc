@@ -41,11 +41,11 @@ DEFINE_bool(prof, false,
 DEFINE_string(rgb, "not-specified",
               "[OPTIONAL] Path to colormap for detections");
 
-DEFINE_string(mask, "../data/t4-seg.colormap",
+DEFINE_string(mask, "not-specified",
               "[OPTIONAL] Path to colormap for semantic segmentation"
               "");
 
-DEFINE_string(names, "../data/t4.names",
+DEFINE_string(names, "./config/t4.names",
               "List of names for detections"
               "List of names for detections");
 
@@ -211,7 +211,7 @@ static std::string trim(std::string s)
 
 static bool fileExists(const std::string fileName, bool verbose)
 {
-    if (!std::experimental::filesystem::exists(std::experimental::filesystem::path(fileName)))
+    if (!std::filesystem::exists(std::filesystem::path(fileName)))
     {
         if (verbose) std::cout << "File does not exist : " << fileName << std::endl;
         return false;

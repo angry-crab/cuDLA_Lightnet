@@ -390,7 +390,7 @@ std::vector<BBoxInfo> Lightnet::nonMaximumSuppression(const float nmsThresh, std
     return out;
 }
 
-void Lightnet::makeMask(std::vector<std::vector<int>> &argmax2bgr)
+void Lightnet::makeMask(std::vector<cv::Vec3b> &argmax2bgr)
 {
     masks_.clear();
     // Formula to identify output tensors not related to bounding box detections.

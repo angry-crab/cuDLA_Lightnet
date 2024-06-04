@@ -121,7 +121,7 @@ public:
   
   std::vector<BBoxInfo> nonMaximumSuppression(const float nmsThresh, std::vector<BBoxInfo> binfo);
 
-  void makeMask(std::vector<std::vector<int>> &argmax2bgr);
+  void makeMask(std::vector<cv::Vec3b> &argmax2bgr);
 
   void makeDepthmap();
 

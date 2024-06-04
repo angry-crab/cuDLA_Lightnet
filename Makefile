@@ -80,7 +80,7 @@ cudla_lightnet: $(NVCCOBJS) $(CXXOBJS) | $(BUILD_DIR)
 	$(CXX) $(ALL_CCFLAGS) $(INCLUDES) $(ALL_LDFLAGS) -o $(BUILD_DIR)/$@ $+ $(LIBRARIES)
 
 run: cudla_lightnet
-	./$(BUILD_DIR)/cudla_lightnet --engine0 ./model/loadable/lightnet.int8.fp16chwin.fp16chwout.standalone.bin --engine1 ./model/loadable/lightnet_320.int8.fp16chwin.fp16chwout.standalone.bin --image /home/autoware/develop/cuDLA_Lightnet/data --backend cudla_fp16
+	./$(BUILD_DIR)/cudla_lightnet --engine=./model/loadable/lightnet.int8.fp16chwin.fp16chwout.standalone.bin --rgb=./config/T4x.colormap --names=./config/T4x.names --precision=fp16 --anchors=10,14,22,22,15,49,35,36,56,52,38,106,92,73,114,118,102,264,201,143,272,232,415,278,274,476,522,616,968,730 --num_anchors=5 --c=10 --subnet_engine=./model/loadable/lightnet_320.int8.fp16chwin.fp16chwout.standalone.bin --subnet_rgb=./config/anonymization.colormap --subnet_names=./config/anonymization.names --subnet_anchors=44,27,136,30,79,52,171,41,157,72,229,49,218,77,191,128,290,182 --subnet_num_anchors=3 --target_names=./config/personal_info.names --bluron=./config/personal_info.names --d=./data --save_detections_path=./results
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

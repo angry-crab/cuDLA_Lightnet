@@ -104,7 +104,7 @@ void saveBoxPred(std::vector<std::string>& map2class, std::vector<std::vector<fl
     return;
 }
 
-void infer(cudla_lightnet::Lightnet &net, std::vector<cv::Mat> &images, std::vector<std::vector<int>> &argmax2bgr)
+void infer(cudla_lightnet::Lightnet &net, std::vector<cv::Mat> &images, std::vector<cv::Vec3b> &argmax2bgr)
 {
     net.preprocess(images);
     net.infer();
@@ -344,6 +344,8 @@ int main(int argc, char **argv)
     };
 
     std::string engine_path_1 = model_config_sub.model_path;
+    std::vector<std::string> target = get_target_names();
+    std::vector<std::string> bluron = get_bluron_names();
 
     std::shared_ptr<cudla_lightnet::Lightnet> lightnet_infer_sub_ptr(new cudla_lightnet::Lightnet(model_config_sub, inference_config, engine_path_1, backend));
     std::vector<std::shared_ptr<cudla_lightnet::Lightnet>> lightnet_subs{lightnet_infer_sub_ptr};
@@ -351,11 +353,14 @@ int main(int argc, char **argv)
     std::vector<cv::Mat>            bgr_imgs;
     std::vector<std::vector<float>> results;
     
-    if (!image_path.empty())
+    if (!path_config.directory.empty())
     {
-        std::string target_path("/home/autoware/develop/cuDLA_Lightnet/data/");
+        // std::string target_path("/home/autoware/develop/cuDLA_Lightnet/data/");
+        std::string target_path = path_config.directory;
         std::filesystem::create_directory(target_path);
-        for (const auto & entry : std::filesystem::directory_iterator(image_path))
+        std::string output_path = path_config.save_path;
+        std::filesystem::create_directory(output_path);
+        for (const auto & entry : std::filesystem::directory_iterator(target_path))
         {
             std::string file = entry.path().string();
             printf("Run lightnet DLA pipeline for %s\n", file.c_str());
@@ -365,7 +370,7 @@ int main(int argc, char **argv)
 
             if(!lightnet_subs.empty())
             {
-                inferSubnetLightnets(lightnet_infer, lightnet_subs, image, visualization_config.names, names_sub, 1);
+                inferSubnetLightnets(lightnet_infer, lightnet_subs, image, visualization_config.names, target, 1);
                 if (bluron.size())
                 {
 	                blurObjectFromSubnetBbox(lightnet_infer, image);
@@ -375,7 +380,8 @@ int main(int argc, char **argv)
             drawLightNet(lightnet_infer, image, visualization_config.colormap, visualization_config.names);
 
             std::string filename = getFilename(file);
-            cv::imwrite("/home/autoware/develop/cuDLA_Lightnet/results/" + filename + ".jpg", image);
+            // cv::imwrite("/home/autoware/develop/cuDLA_Lightnet/results/" + filename + ".jpg", image);
+            cv::imwrite(output_path + "/" + filename + ".jpg", image);
 
             // saveBoxPred(map2class, results, file, target_path);
             bgr_imgs.clear();
