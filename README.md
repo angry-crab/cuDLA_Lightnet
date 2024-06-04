@@ -16,10 +16,13 @@ Docker image (nvcr.io/nvidia/l4t-jetpack:r36.2.0)
 `sudo apt update`
 
 
-`sudo apt install libopencv-dev libjsoncpp-dev python3-pip git git-lfs`
+`sudo apt install libopencv-dev python3-pip libgflags-dev git git-lfs`
 
 
 # Instructions
+
+
+`bash script/build_dla.sh`
 
 
 `make -j`

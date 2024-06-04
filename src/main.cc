@@ -10,33 +10,51 @@
 #include <filesystem>
 
 #include "cudla_lightnet.hpp"
+#include "config_parser.h"
 
-class InputParser
-{
-  public:
-    InputParser(int &argc, char **argv)
-    {
-        for (int i = 1; i < argc; ++i)
-            this->tokens.push_back(std::string(argv[i]));
-    }
-    std::string getCmdOption(const std::string &option) const
-    {
-        std::vector<std::string>::const_iterator itr;
-        itr = std::find(this->tokens.begin(), this->tokens.end(), option);
-        if (itr != this->tokens.end() && ++itr != this->tokens.end())
-        {
-            return *itr;
-        }
-        static std::string empty_string("");
-        return empty_string;
-    }
-    bool cmdOptionExists(const std::string &option) const
-    {
-        return std::find(this->tokens.begin(), this->tokens.end(), option) != this->tokens.end();
-    }
+// class InputParser
+// {
+//   public:
+//     InputParser(int &argc, char **argv)
+//     {
+//         for (int i = 1; i < argc; ++i)
+//             this->tokens.push_back(std::string(argv[i]));
+//     }
+//     std::string getCmdOption(const std::string &option) const
+//     {
+//         std::vector<std::string>::const_iterator itr;
+//         itr = std::find(this->tokens.begin(), this->tokens.end(), option);
+//         if (itr != this->tokens.end() && ++itr != this->tokens.end())
+//         {
+//             return *itr;
+//         }
+//         static std::string empty_string("");
+//         return empty_string;
+//     }
+//     bool cmdOptionExists(const std::string &option) const
+//     {
+//         return std::find(this->tokens.begin(), this->tokens.end(), option) != this->tokens.end();
+//     }
 
-  private:
-    std::vector<std::string> tokens;
+//   private:
+//     std::vector<std::string> tokens;
+// };
+
+struct PathConfig {
+    std::string directory; ///< Directory containing images for inference.
+    int camera_id; ///< Camera device ID for live inference.
+    std::string dump_path; ///< Path for dumping intermediate data or debug info.
+    std::string output_path; ///< Path to save inference output.
+    bool flg_save; ///< Flag indicating whether to save inference output.
+    std::string save_path; ///< Directory path where output should be saved.
+    bool flg_save_debug_tensors;
+};
+
+struct VisualizationConfig {
+  bool dont_show; ///< Flag indicating whether to suppress displaying the output window.
+  std::vector<std::vector<int>> colormap; ///< Color mapping for classes in bounding boxes.
+  std::vector<std::string> names; ///< Names of the classes for display.
+  std::vector<cv::Vec3b> argmax2bgr; ///< Mapping from class indices to BGR colors for segmentation masks.
 };
 
 template <typename ... Args>
@@ -200,65 +218,134 @@ void drawLightNet(cudla_lightnet::Lightnet &net, cv::Mat &image, std::vector<std
   net.drawBbox(image, bbox, colormap, names);
 }
 
+std::vector<cv::Vec3b> getArgmaxToBgr(const std::vector<cudla_lightnet::Colormap> colormap)
+{
+  std::vector<cv::Vec3b> argmax2bgr;
+  for (const auto &map : colormap) {
+    argmax2bgr.emplace_back(cv::Vec3b(map.color[2], map.color[1], map.color[0]));
+  }
+  return argmax2bgr;
+}
+
 int main(int argc, char **argv)
 {
-    InputParser input(argc, argv);
-    if (input.cmdOptionExists("-h"))
-    {
-        printf("Usage 1: ./validate_coco --engine path_to_engine_or_loadable  --coco_path path_to_coco_dataset "
-               "--backend cudla_fp16/cudla_int8\n");
-        printf("Usage 2: ./validate_coco --engine path_to_engine_or_loadable  --image path_to_image --backend "
-               "cudla_fp16/cudla_int8\n");
-        return 0;
-    }
-    std::string engine_path_0 = input.getCmdOption("--engine0");
-    std::string engine_path_1 = input.getCmdOption("--engine1");
-    if (engine_path_0.empty())
-    {
-        printf("Error: please specify the loadable path with --engine");
-        return 0;
-    }
-    std::string backend_str = input.getCmdOption("--backend");
-    std::string coco_path   = input.getCmdOption("--coco_path");
-    std::string image_path  = input.getCmdOption("--image");
+    // InputParser input(argc, argv);
+    // if (input.cmdOptionExists("-h"))
+    // {
+    //     printf("Usage 1: ./validate_coco --engine path_to_engine_or_loadable  --coco_path path_to_coco_dataset "
+    //            "--backend cudla_fp16/cudla_int8\n");
+    //     printf("Usage 2: ./validate_coco --engine path_to_engine_or_loadable  --image path_to_image --backend "
+    //            "cudla_fp16/cudla_int8\n");
+    //     return 0;
+    // }
+    // std::string engine_path_0 = input.getCmdOption("--engine0");
+    // std::string engine_path_1 = input.getCmdOption("--engine1");
+    // if (engine_path_0.empty())
+    // {
+    //     printf("Error: please specify the loadable path with --engine");
+    //     return 0;
+    // }
+    // std::string backend_str = input.getCmdOption("--backend");
+    // std::string coco_path   = input.getCmdOption("--coco_path");
+    // std::string image_path  = input.getCmdOption("--image");
 
-    std::vector<std::vector<int>> color_map{{255,255,255}, {0,0,255}, {0,160,165}, {100,0,200},
-                                        {128,255,0}, {255,255,0}, {255,0,32}, {255,0,0}, {255,0,255}, {0,255,0}};
-    std::vector<std::string> map2class{"UNKNOWN", "CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN", "ANIMAL", "TRAFFIC_LIGHT", "TRAFFIC_SIGN"};
+    // std::vector<std::vector<int>> color_map{{255,255,255}, {0,0,255}, {0,160,165}, {100,0,200},
+    //                                     {128,255,0}, {255,255,0}, {255,0,32}, {255,0,0}, {255,0,255}, {0,255,0}};
+    // std::vector<std::string> map2class{"UNKNOWN", "CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN", "ANIMAL", "TRAFFIC_LIGHT", "TRAFFIC_SIGN"};
+
+    // cudla_lightnet::LightnetBackend backend = cudla_lightnet::LightnetBackend::CUDLA_FP16;
+    // if (backend_str == "cudla_int8")
+    // {
+    //     backend = cudla_lightnet::LightnetBackend::CUDLA_INT8;
+    // }
+
+    // std::vector<std::string> bluron{"CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN"};
+
+    // ModelConfig model_config{engine_path_0, 10, 0.2, {10,14,22,22,15,49,35,36,56,52,38,106,92,73,114,118,102,264,201,143,272,232,415,278,274,476,522,616,968,730},
+    //     5, 0.45f};
+    // InferenceConfig inference_config = {"fp16", false, false, 0, true, false, 1,
+    //     1.0, // Assuming a fixed value or obtained similarly.
+    //     (1 << 30)};
+    // VisualizationConfig visualization_config = {false,
+    //     color_map, map2class,
+    //     color_map};
+
+    // cudla_lightnet::Lightnet lightnet_infer(model_config, inference_config, engine_path_0, backend);
+
+    // std::vector<std::vector<int>> color_map_sub{{224,224,224}, {196,196,196}};
+    // std::vector<std::string> map2class_sub{"LICENSE_PLATE", "HUMAN_HEAD"};
+    // std::vector<std::string> names_sub{"CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN"};
+
+    // ModelConfig model_config_sub{engine_path_1, 2, 0.2, {44,27,136,30,79,52,171,41,157,72,229,49,218,77,191,128,290,182},
+    //     3, 0.25f};
+    // InferenceConfig inference_config_sub = {"fp16", false, false, 1, true, false, 1,
+    //     1.0, // Assuming a fixed value or obtained similarly.
+    //     (1 << 30)};
+    // VisualizationConfig visualization_config_sub = {false,
+    //     color_map_sub, map2class_sub,
+    //     color_map_sub};
+
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    ModelConfig model_config = {
+        .model_path = get_engine_path(),
+        .num_class = get_classes(),
+        .score_threshold = static_cast<float>(get_score_thresh()),
+        .anchors = get_anchors(),
+        .num_anchors = get_num_anchors(),
+        .nms_threshold = 0.45f, // Assuming this value is fixed or retrieved similarly.
+    };
+
+    InferenceConfig inference_config = {
+        .precision = get_precision(),    
+        .batch_size = get_batch_size(),
+        .scale = 1.0, // Assuming a fixed value or obtained similarly.
+        .workspace_size = (1 << 30)
+    };
+
+    PathConfig path_config = {
+    .directory = get_directory_path(),
+    .camera_id = get_camera_id(),
+    .dump_path = get_dump_path(),
+    .output_path = get_output_path(),
+    .flg_save = getSaveDetections(),
+    .save_path = getSaveDetectionsPath(),
+    .flg_save_debug_tensors = get_save_debug_tensors()
+    };
+
+    VisualizationConfig visualization_config = {
+    .dont_show = is_dont_show(),
+    .colormap = get_colormap(),
+    .names = get_names(),
+    .argmax2bgr = getArgmaxToBgr(get_seg_colormap())
+    };
 
     cudla_lightnet::LightnetBackend backend = cudla_lightnet::LightnetBackend::CUDLA_FP16;
-    if (backend_str == "cudla_int8")
-    {
-        backend = cudla_lightnet::LightnetBackend::CUDLA_INT8;
-    }
 
-    std::vector<std::string> bluron{"CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN"};
-
-    ModelConfig model_config{engine_path_0, 10, 0.2, {10,14,22,22,15,49,35,36,56,52,38,106,92,73,114,118,102,264,201,143,272,232,415,278,274,476,522,616,968,730},
-        5, 0.45f};
-    InferenceConfig inference_config = {"fp16", false, false, 0, true, false, 1,
-        1.0, // Assuming a fixed value or obtained similarly.
-        (1 << 30)};
-    VisualizationConfig visualization_config = {false,
-        color_map, map2class,
-        color_map};
+    std::string engine_path_0 = model_config.model_path;
 
     cudla_lightnet::Lightnet lightnet_infer(model_config, inference_config, engine_path_0, backend);
 
-    std::vector<std::vector<int>> color_map_sub{{224,224,224}, {196,196,196}};
-    std::vector<std::string> map2class_sub{"LICENSE_PLATE", "HUMAN_HEAD"};
-    std::vector<std::string> names_sub{"CAR", "TRUCK", "BUS", "BICYCLE", "MOTORBIKE", "PEDESTRIAN"};
 
-    ModelConfig model_config_sub{engine_path_1, 2, 0.2, {44,27,136,30,79,52,171,41,157,72,229,49,218,77,191,128,290,182},
-        3, 0.25f};
-    InferenceConfig inference_config_sub = {"fp16", false, false, 1, true, false, 1,
-        1.0, // Assuming a fixed value or obtained similarly.
-        (1 << 30)};
-    VisualizationConfig visualization_config_sub = {false,
-        color_map_sub, map2class_sub,
-        color_map_sub};
+    ModelConfig model_config_sub = {
+        .model_path = get_subnet_engine_path(),
+        .num_class = get_subnet_classes(),
+        .score_threshold = static_cast<float>(get_score_thresh()),
+        .anchors = get_subnet_anchors(),
+        .num_anchors = get_subnet_num_anchors(),
+        .nms_threshold = 0.25f, // Assuming this value is fixed or retrieved similarly.
+    };
 
-    std::shared_ptr<cudla_lightnet::Lightnet> lightnet_infer_sub_ptr(new cudla_lightnet::Lightnet(model_config_sub, inference_config_sub, engine_path_1, backend));
+    VisualizationConfig visualization_config_sub = {
+    .dont_show = is_dont_show(),
+    .colormap = get_subnet_colormap(),
+    .names = get_subnet_names(),
+    .argmax2bgr = getArgmaxToBgr(get_seg_colormap())
+    };
+
+    std::string engine_path_1 = model_config_sub.model_path;
+
+    std::shared_ptr<cudla_lightnet::Lightnet> lightnet_infer_sub_ptr(new cudla_lightnet::Lightnet(model_config_sub, inference_config, engine_path_1, backend));
     std::vector<std::shared_ptr<cudla_lightnet::Lightnet>> lightnet_subs{lightnet_infer_sub_ptr};
 
     std::vector<cv::Mat>            bgr_imgs;

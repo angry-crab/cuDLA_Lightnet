@@ -57,6 +57,7 @@ LIBRARIES += -l cudla -L$(CUDA_PATH)/lib64 \
              -l cuda -l cudart -l nvinfer \
              -L $(OPENCV_LIB_PATH) \
 			 -l pthread \
+			 -l gflags \
 	         -l opencv_objdetect -l opencv_highgui -l opencv_imgproc -l opencv_core -l opencv_imgcodecs -l opencv_dnn \
 			 -L /usr/lib/aarch64-linux-gnu/nvidia/ -lnvscibuf \
 			 -L /usr/lib/aarch64-linux-gnu/nvidia/ -lnvscisync

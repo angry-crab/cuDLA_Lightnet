@@ -32,24 +32,9 @@ struct ModelConfig {
  */
 struct InferenceConfig {
   std::string precision; ///< Precision mode for inference (e.g., FP32, FP16).
-  bool profile; ///< Flag to enable profiling to measure inference performance.
-  bool sparse; ///< Flag to enable sparsity in the model, if supported.
-  int dla_core_id; ///< ID of the DLA core to use for inference, if applicable.
-  bool use_first_layer; ///< Flag to use the first layer in calculations, typically for INT8 calibration.
-  bool use_last_layer; ///< Flag to use the last layer in calculations, affecting performance and accuracy.
   int batch_size; ///< Number of images processed in one inference batch.
   double scale; ///< Scale factor for input image normalization.
   size_t workspace_size; ///< Maximum workspace size for TensorRT.
-};
-/**
- * Configuration for visualization settings, including whether to show output
- * and how to colorize different aspects of the output.
- */
-struct VisualizationConfig {
-  bool dont_show; ///< Flag indicating whether to suppress displaying the output window.
-  std::vector<std::vector<int>> colormap; ///< Color mapping for classes in bounding boxes.
-  std::vector<std::string> names; ///< Names of the classes for display.
-  std::vector<std::vector<int>> argmax2bgr; ///< Mapping from class indices to BGR colors for segmentation masks.
 };
 
 namespace cudla_lightnet
@@ -166,9 +151,6 @@ public:
 
   std::vector<float> input_h_;
 
-  // std::vector<float> output_h0_;
-  // std::vector<float> output_h1_;
-  // std::vector<float> output_h2_;
   std::vector<std::vector<float>> output_h_;
 
   std::vector<int> input_dims;
