@@ -161,8 +161,8 @@ void Lightnet::infer()
     int r_0 = roundup(output_dims_0[3], mByte);
     std::vector<float> fp_0_float(dim3_0 * r_0);
     copyHalf2Float(fp_0_float, 0);
-    std::vector<float> fp_0(dim3_0 * output_dims_0[3], 0);
-    reformat(fp_0_float, fp_0, output_dims_0, mByte);
+    // std::vector<float> fp_0(dim3_0 * output_dims_0[3], 0);
+    // reformat(fp_0_float, fp_0, output_dims_0, mByte);
 
     // print_dla_addr((half *)mCuDLACtx->getOutputCudaBufferPtr(0), 25, dim_0, mStream);
     // checkCudaErrors(cudaStreamSynchronize(mStream));
@@ -171,8 +171,8 @@ void Lightnet::infer()
     int r_1 = roundup(output_dims_1[3], mByte);
     std::vector<float> fp_1_float(dim3_1 * r_1);
     copyHalf2Float(fp_1_float, 1);
-    std::vector<float> fp_1(dim3_1 * output_dims_1[3], 0);
-    reformat(fp_1_float, fp_1, output_dims_1, mByte);
+    // std::vector<float> fp_1(dim3_1 * output_dims_1[3], 0);
+    // reformat(fp_1_float, fp_1, output_dims_1, mByte);
 
     // print_dla_addr((half *)mCuDLACtx->getOutputCudaBufferPtr(1), 20, dim_0, mStream);
     // checkCudaErrors(cudaStreamSynchronize(mStream));
@@ -181,12 +181,16 @@ void Lightnet::infer()
     int r_2 = roundup(output_dims_2[3], mByte);
     std::vector<float> fp_2_float(dim3_2 * r_2);
     copyHalf2Float(fp_2_float, 2);
-    std::vector<float> fp_2(dim3_2 * output_dims_2[3], 0);
-    reformat(fp_2_float, fp_2, output_dims_2, mByte);
+    // std::vector<float> fp_2(dim3_2 * output_dims_2[3], 0);
+    // reformat(fp_2_float, fp_2, output_dims_2, mByte);
     
-    output_h_.push_back(fp_0);
-    output_h_.push_back(fp_1);
-    output_h_.push_back(fp_2);
+    // output_h_.push_back(fp_0);
+    // output_h_.push_back(fp_1);
+    // output_h_.push_back(fp_2);
+
+    output_h_.push_back(fp_0_float);
+    output_h_.push_back(fp_1_float);
+    output_h_.push_back(fp_2_float);
 }
 
 void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
@@ -209,7 +213,8 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
     std::vector<std::vector<int>> dims{output_dims_0, output_dims_1, output_dims_2};
     for (int i = 0; i < output_h_.size(); i++) {
         auto dim = dims[i];
-        int gridW = dim[3];
+        // int gridW = dim[3];
+        int gridW = roundup(dim[3], mByte);
         int gridH = dim[2];
         int chan = dim[1];
 
