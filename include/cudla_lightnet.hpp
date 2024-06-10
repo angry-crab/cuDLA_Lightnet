@@ -108,7 +108,7 @@ public:
 
   void makeBbox(const int imageH, const int imageW);
 
-  std::vector<BBoxInfo> decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const float *output, const int gridW, const int gridH);
+  std::vector<BBoxInfo> decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const float *output, const int gridW, const int gridH, const int gridW_unpad);
 
   void addBboxProposal(const float bx, const float by, const float bw, const float bh,
 				    const uint32_t stride_h_, const uint32_t stride_w_, const int maxIndex, const float maxProb,

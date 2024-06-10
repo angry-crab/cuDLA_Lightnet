@@ -220,7 +220,7 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
 
         if (chan_size == chan)
         { // Filtering out the tensors that match the channel size for detections.
-            std::vector<BBoxInfo> b = decodeTensor(0, imageH, imageW, inputH, inputW, &(anchors_[num_anchor_ * (detection_count) * 2]), num_anchor_, output_h_[i].data(), gridW, gridH);
+            std::vector<BBoxInfo> b = decodeTensor(0, imageH, imageW, inputH, inputW, &(anchors_[num_anchor_ * (detection_count) * 2]), num_anchor_, output_h_[i].data(), gridW, gridH, dim[3]);
             bbox_.insert(bbox_.end(), b.begin(), b.end());
             detection_count++;
         }
@@ -229,7 +229,7 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
     //    bbox_ = nmsAllClasses(nms_threshold_, bbox_, num_class_); // Apply NMS and return the filtered bounding boxes.   
 }
 
-std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const float *output, const int gridW, const int gridH)
+std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const float *output, const int gridW, const int gridH, const int gridW_unpad)
 {
     const int volume = gridW * gridH;
     // ??????
@@ -289,7 +289,7 @@ std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int image
                 if (maxProb > score_threshold_)
                 {
                     const uint32_t strideH = inputH / gridH;
-                    const uint32_t strideW = inputW / gridW;
+                    const uint32_t strideW = inputW / gridW_unpad;
                     addBboxProposal(bx, by, bw, bh, strideH, strideW, maxIndex, maxProb, imageW, imageH, inputW, inputH, binfo);
                 }
             }
