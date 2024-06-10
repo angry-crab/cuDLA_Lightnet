@@ -42,6 +42,7 @@
 
 struct PathConfig {
     std::string directory; ///< Directory containing images for inference.
+    std::string video_path; ///< Path to a video file for inference.  
     int camera_id; ///< Camera device ID for live inference.
     std::string dump_path; ///< Path for dumping intermediate data or debug info.
     std::string output_path; ///< Path to save inference output.
@@ -120,7 +121,7 @@ void inferSubnetLightnets(cudla_lightnet::Lightnet &lightnet, std::vector<std::s
     int num = bbox.size();
     std::vector<std::vector<cudla_lightnet::BBoxInfo>> tmpBbox;
     tmpBbox.resize(numWorks);
-    // #pragma omp parallel for  
+#pragma omp parallel for  
     for (int p = 0; p < numWorks; p++)
     {
         std::vector<cudla_lightnet::BBoxInfo> subnetBbox;
@@ -218,6 +219,14 @@ void drawLightNet(cudla_lightnet::Lightnet &net, cv::Mat &image, std::vector<std
   net.drawBbox(image, bbox, colormap, names);
 }
 
+void drawSubnetLightNet(cudla_lightnet::Lightnet &net, cv::Mat &image, std::vector<std::vector<int>> &colormap, std::vector<std::string> &names)
+{
+  std::vector<cudla_lightnet::BBoxInfo> subnet_bbox = net.getSubnetBbox();
+  
+  net.drawBbox(image, subnet_bbox, colormap, names);
+}
+
+
 std::vector<cv::Vec3b> getArgmaxToBgr(const std::vector<cudla_lightnet::Colormap> colormap)
 {
   std::vector<cv::Vec3b> argmax2bgr;
@@ -305,6 +314,7 @@ int main(int argc, char **argv)
 
     PathConfig path_config = {
     .directory = get_directory_path(),
+    .video_path = get_video_path(),    
     .camera_id = get_camera_id(),
     .dump_path = get_dump_path(),
     .output_path = get_output_path(),
@@ -324,7 +334,7 @@ int main(int argc, char **argv)
 
     std::string engine_path_0 = model_config.model_path;
 
-    cudla_lightnet::Lightnet lightnet_infer(model_config, inference_config, engine_path_0, backend);
+    cudla_lightnet::Lightnet lightnet_infer(model_config, inference_config, engine_path_0, backend, 0);
 
 
     ModelConfig model_config_sub = {
@@ -346,13 +356,16 @@ int main(int argc, char **argv)
     std::string engine_path_1 = model_config_sub.model_path;
     std::vector<std::string> target = get_target_names();
     std::vector<std::string> bluron = get_bluron_names();
-
-    std::shared_ptr<cudla_lightnet::Lightnet> lightnet_infer_sub_ptr(new cudla_lightnet::Lightnet(model_config_sub, inference_config, engine_path_1, backend));
-    std::vector<std::shared_ptr<cudla_lightnet::Lightnet>> lightnet_subs{lightnet_infer_sub_ptr};
+    int numWorkers = 4;
+    std::vector<std::shared_ptr<cudla_lightnet::Lightnet>> lightnet_subs;
+    for (int p = 0; p < numWorkers; p++) {
+      std::shared_ptr<cudla_lightnet::Lightnet> lightnet_infer_sub_ptr(new cudla_lightnet::Lightnet(model_config_sub, inference_config, engine_path_1, backend, p%2));
+      lightnet_subs.push_back(lightnet_infer_sub_ptr);
+    }
+      //std::vector<std::shared_ptr<cudla_lightnet::Lightnet>> lightnet_subs{lightnet_infer_sub_ptr};
 
     std::vector<cv::Mat>            bgr_imgs;
     std::vector<std::vector<float>> results;
-    
     if (!path_config.directory.empty())
     {
         // std::string target_path("/home/autoware/develop/cuDLA_Lightnet/data/");
@@ -370,7 +383,7 @@ int main(int argc, char **argv)
 
             if(!lightnet_subs.empty())
             {
-                inferSubnetLightnets(lightnet_infer, lightnet_subs, image, visualization_config.names, target, 1);
+                inferSubnetLightnets(lightnet_infer, lightnet_subs, image, visualization_config.names, target, numWorkers);
                 if (bluron.size())
                 {
 	                blurObjectFromSubnetBbox(lightnet_infer, image);
@@ -386,7 +399,55 @@ int main(int argc, char **argv)
             // saveBoxPred(map2class, results, file, target_path);
             bgr_imgs.clear();
             results.clear();
+	    if (!visualization_config.dont_show) {
+	      if (image.rows > 960 && image.cols > 960) {
+		cv::resize(image, image, cv::Size(960, 640), 0, 0, cv::INTER_LINEAR);
+	      }
+	      cv::imshow("inference", image);	
+	      cv::waitKey(0);
+	    }	    
         }
+    }
+    else if (!path_config.video_path.empty() || path_config.camera_id != -1) {
+      cv::VideoCapture video;
+      if (path_config.camera_id != -1) {
+	video.open(path_config.camera_id);
+      } else {
+	video.open(path_config.video_path);
+      }
+      int count =0;
+      while (1) {
+	cv::Mat image;
+	video >> image;
+	bgr_imgs.push_back(image);
+	infer(lightnet_infer, bgr_imgs, visualization_config.argmax2bgr);
+	if(!lightnet_subs.empty())
+	  {
+	    inferSubnetLightnets(lightnet_infer, lightnet_subs, image, visualization_config.names, target, numWorkers);
+	    if (bluron.size())
+	      {
+		blurObjectFromSubnetBbox(lightnet_infer, image);
+	      }
+	    drawSubnetLightNet(lightnet_infer, image, visualization_config_sub.colormap, visualization_config_sub.names);  
+	  }
+	drawLightNet(lightnet_infer, image, visualization_config.colormap, visualization_config.names);
+	if (!visualization_config.dont_show) {
+	  //if (image.rows > 1280 && image.cols > 1920) {
+	  if(1) {
+	    cv::resize(image, image, cv::Size(1280, 960), 0, 0, cv::INTER_LINEAR);
+	  }
+	  cv::imshow("inference", image);	
+	  if (cv::waitKey(1) == 'q') {
+	    break;
+	  }
+	}
+	bgr_imgs.clear();
+	results.clear();
+	if (count > 1000) {
+	  break;
+	}
+      }
+
     }
 
     return 0;

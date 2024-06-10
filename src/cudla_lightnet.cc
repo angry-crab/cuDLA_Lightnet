@@ -50,7 +50,7 @@ static void reformat(std::vector<float>& input, std::vector<float>& output, std:
     }
 }
 
-Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config, std::string &engine_path, LightnetBackend backend)
+Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config, std::string &engine_path, LightnetBackend backend, int dla_id)
 {
     const std::string& model_path = model_config.model_path;
     const std::string& precision = inference_config.precision;
@@ -79,8 +79,9 @@ Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config,
     checkCudaErrors(cudaStreamCreateWithFlags(&mStream, cudaStreamNonBlocking));
 
     cudaFree(0);
-
-    mCuDLACtx = new cuDLAContextStandalone(engine_path.c_str());
+    dla_id_ = dla_id;
+    
+    mCuDLACtx = new cuDLAContextStandalone(engine_path.c_str(), dla_id_);
 
     void *input_buf = nullptr;
     void *output_buf_0;
@@ -101,6 +102,7 @@ Lightnet::Lightnet(ModelConfig &model_config, InferenceConfig &inference_config,
     output_dims_0 = mCuDLACtx->getOutputTensorDims(0);
     output_dims_1 = mCuDLACtx->getOutputTensorDims(1);
     output_dims_2 = mCuDLACtx->getOutputTensorDims(2);
+
 }
 
 Lightnet::~Lightnet()
@@ -136,13 +138,13 @@ void Lightnet::pushImg(void *imgBuffer, int numImg, bool fromCPU)
     {
         std::vector<__half> tmp_fp(dim);
         convert_float_to_half((float *)imgBuffer, tmp_fp.data(), dim);
-        checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpyAsync(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_fp.data(), dim * sizeof(__half), cudaMemcpyHostToDevice, mStream));
     }
     if (mBackend == LightnetBackend::CUDLA_INT8)
     {
         std::vector<int8_t> tmp_int(dim);
         convert_float_to_int8((float *)imgBuffer, tmp_int.data(), dim, mInputScale);
-        checkCudaErrors(cudaMemcpy(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_int.data(), dim * sizeof(int8_t), cudaMemcpyHostToDevice));
+        checkCudaErrors(cudaMemcpyAsync(mCuDLACtx->getInputCudaBufferPtr(0), (void *)tmp_int.data(), dim * sizeof(int8_t), cudaMemcpyHostToDevice, mStream));
     }
 }
 
@@ -151,11 +153,11 @@ void Lightnet::infer()
     output_h_.clear();
 
     // TODO: find another way to sync device
-    checkCudaErrors(cudaDeviceSynchronize());
+    //checkCudaErrors(cudaDeviceSynchronize());
 
     mCuDLACtx->submitDLATask(mStream);
-    checkCudaErrors(cudaDeviceSynchronize());
-
+    //checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(mStream));
     // iff output format is fp16
     int dim3_0 = output_dims_0[0] * output_dims_0[1] * output_dims_0[2];
     int r_0 = roundup(output_dims_0[3], mByte);
@@ -193,8 +195,8 @@ void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
 {
     int dim_0 = out_float.size();
     std::vector<__half> fp_0(dim_0);
-    checkCudaErrors(cudaDeviceSynchronize());
-    checkCudaErrors(cudaMemcpy(fp_0.data(), mCuDLACtx->getOutputCudaBufferPtr(binding_idx), dim_0 * sizeof(__half), cudaMemcpyDeviceToHost));
+    //checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaMemcpyAsync(fp_0.data(), mCuDLACtx->getOutputCudaBufferPtr(binding_idx), dim_0 * sizeof(__half), cudaMemcpyDeviceToHost, mStream));
     convert_half_to_float((__half *)fp_0.data(), (float *)out_float.data(), dim_0);
 }
 

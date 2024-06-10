@@ -94,7 +94,7 @@ class Lightnet
 {
 public:
 
-  Lightnet(ModelConfig &model_config, InferenceConfig &inference_config, std::string &engine_path, LightnetBackend backend);
+  Lightnet(ModelConfig &model_config, InferenceConfig &inference_config, std::string &engine_path, LightnetBackend backend, int dla_id);
 
   ~Lightnet();
 
@@ -246,6 +246,7 @@ public:
    */
   std::vector<BBoxInfo> subnet_bbox_;
 
+  int dla_id_;
 };
 
 }

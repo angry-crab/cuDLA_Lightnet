@@ -126,11 +126,13 @@ void createAndSetAttrList(NvSciBufModule module, uint64_t bufSize, NvSciBufAttrL
     CHECK_NVSCI_ERR(sciStatus, "set NvSci buffer attr list");
 }
 
-cuDLAContextStandalone::cuDLAContextStandalone(const char *loadableFilePath)
+cuDLAContextStandalone::cuDLAContextStandalone(const char *loadableFilePath, const int dla_id)
 {
+    m_dla_id = dla_id;
     readDLALoadable(loadableFilePath);
     initialize();
     m_Has_initialized = true;
+ 
 }
 
 // Read loadable in to memory
@@ -175,7 +177,7 @@ void cuDLAContextStandalone::readDLALoadable(const char *loadableFilePath)
 void cuDLAContextStandalone::initialize()
 {
     // Create CUDLA device
-    m_cudla_err = cudlaCreateDevice(0, &m_DevHandle, CUDLA_STANDALONE);
+    m_cudla_err = cudlaCreateDevice(m_dla_id, &m_DevHandle, CUDLA_STANDALONE);
     CHECK_CUDLA_ERR(m_cudla_err, "create CUDLA device");
 
     // Load CUDLA module
@@ -433,11 +435,11 @@ uint32_t cuDLAContextStandalone::getNumOutputTensors() { return m_NumOutputTenso
 int cuDLAContextStandalone::submitDLATask(cudaStream_t streamToRun)
 {
     m_cuda_err = cudaSignalExternalSemaphoresAsync(&m_SignalSem, &m_SignalParams, 1, streamToRun);
-    CHECK_CUDA_ERR(m_cuda_err, "signal external semaphores on previous stream");
+    //CHECK_CUDA_ERR(m_cuda_err, "signal external semaphores on previous stream");
     m_cudla_err = cudlaSubmitTask(m_DevHandle, &m_Task, 1, nullptr, 0);
-    CHECK_CUDLA_ERR(m_cudla_err, "submit cudla task");
+    //CHECK_CUDLA_ERR(m_cudla_err, "submit cudla task");
     m_cuda_err = cudaWaitExternalSemaphoresAsync(&m_WaitSem, &m_WaitParams, 1, streamToRun);
-    CHECK_CUDA_ERR(m_cuda_err, "wait external semaphores on previous stream");
+    //CHECK_CUDA_ERR(m_cuda_err, "wait external semaphores on previous stream");
 #ifdef USE_DETERMINISTIC_SEMAPHORE
     // update prefence for next submission
     m_nvsci_err = NvSciSyncFenceExtractFence(m_WaitEventContext.nvsci_fence_ptr ,&m_WaiterID, &m_WaiterValue);
