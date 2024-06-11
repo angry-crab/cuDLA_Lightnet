@@ -159,8 +159,11 @@ void Lightnet::infer()
     // iff output format is fp16
     int dim3_0 = output_dims_0[0] * output_dims_0[1] * output_dims_0[2];
     int r_0 = roundup(output_dims_0[3], mByte);
-    std::vector<float> fp_0_float(dim3_0 * r_0);
-    copyHalf2Float(fp_0_float, 0);
+    // std::vector<float> fp_0_float(dim3_0 * r_0);
+    std::vector<__half> fp_0(dim3_0 * r_0);
+    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaMemcpy(fp_0.data(), mCuDLACtx->getOutputCudaBufferPtr(0), fp_0.size() * sizeof(__half), cudaMemcpyDeviceToHost));
+    // copyHalf2Float(fp_0_float, 0);
     // std::vector<float> fp_0(dim3_0 * output_dims_0[3], 0);
     // reformat(fp_0_float, fp_0, output_dims_0, mByte);
 
@@ -169,8 +172,11 @@ void Lightnet::infer()
 
     int dim3_1 = output_dims_1[0] * output_dims_1[1] * output_dims_1[2];
     int r_1 = roundup(output_dims_1[3], mByte);
-    std::vector<float> fp_1_float(dim3_1 * r_1);
-    copyHalf2Float(fp_1_float, 1);
+    // std::vector<float> fp_1_float(dim3_1 * r_1);
+    std::vector<__half> fp_1(dim3_1 * r_1);
+    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaMemcpy(fp_1.data(), mCuDLACtx->getOutputCudaBufferPtr(1), fp_1.size() * sizeof(__half), cudaMemcpyDeviceToHost));
+    // copyHalf2Float(fp_1_float, 1);
     // std::vector<float> fp_1(dim3_1 * output_dims_1[3], 0);
     // reformat(fp_1_float, fp_1, output_dims_1, mByte);
 
@@ -179,18 +185,21 @@ void Lightnet::infer()
     
     int dim3_2 = output_dims_2[0] * output_dims_2[1] * output_dims_2[2];
     int r_2 = roundup(output_dims_2[3], mByte);
-    std::vector<float> fp_2_float(dim3_2 * r_2);
-    copyHalf2Float(fp_2_float, 2);
+    // std::vector<float> fp_2_float(dim3_2 * r_2);
+    std::vector<__half> fp_2(dim3_2 * r_2);
+    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaMemcpy(fp_2.data(), mCuDLACtx->getOutputCudaBufferPtr(2), fp_2.size() * sizeof(__half), cudaMemcpyDeviceToHost));
+    // copyHalf2Float(fp_2_float, 2);
     // std::vector<float> fp_2(dim3_2 * output_dims_2[3], 0);
     // reformat(fp_2_float, fp_2, output_dims_2, mByte);
     
-    // output_h_.push_back(fp_0);
-    // output_h_.push_back(fp_1);
-    // output_h_.push_back(fp_2);
+    output_h_.push_back(fp_0);
+    output_h_.push_back(fp_1);
+    output_h_.push_back(fp_2);
 
-    output_h_.push_back(fp_0_float);
-    output_h_.push_back(fp_1_float);
-    output_h_.push_back(fp_2_float);
+    // output_h_.push_back(fp_0_float);
+    // output_h_.push_back(fp_1_float);
+    // output_h_.push_back(fp_2_float);
 }
 
 void Lightnet::copyHalf2Float(std::vector<float>& out_float, int binding_idx)
@@ -229,11 +238,11 @@ void Lightnet::makeBbox(const int imageH, const int imageW)
     //    bbox_ = nmsAllClasses(nms_threshold_, bbox_, num_class_); // Apply NMS and return the filtered bounding boxes.   
 }
 
-std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const float *output, const int gridW, const int gridH, const int gridW_unpad)
+std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int imageH, const int imageW,  const int inputH, const int inputW, const int *anchor, const int anchor_num, const __half *output, const int gridW, const int gridH, const int gridW_unpad)
 {
     const int volume = gridW * gridH;
     // ??????
-    const float* detections = &output[imageIdx * volume * anchor_num * (5 + num_class_)];
+    const __half* detections = &output[imageIdx * volume * anchor_num * (5 + num_class_)];
 
     std::vector<BBoxInfo> binfo;
     const float scale_x_y = 2.0; // Scale factor used for bounding box center adjustments.
@@ -248,7 +257,7 @@ std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int image
                 const int numGridCells = gridH * gridW;
                 const int bbindex = (y * gridW + x) + numGridCells * b * (5 + num_class_);
 
-                const float objectness = detections[bbindex + 4 * numGridCells]; // Objectness score.
+                const float objectness = __half2float(detections[bbindex + 4 * numGridCells]); // Objectness score.
                 if (objectness < score_threshold_)
                 {
                     continue; // Skip detection if below threshold.
@@ -266,17 +275,17 @@ std::vector<BBoxInfo> Lightnet::decodeTensor(const int imageIdx, const int image
                 // bh = (th * 2) * (th * 2) * pw
                 // The sigmoid is included in the last layer of the DNN models.
                 // Cite in https://alexeyab84.medium.com/scaled-yolo-v4-is-the-best-neural-network-for-object-detection-on-ms-coco-dataset-39dfa22fa982 (Loss for YOLOv3, YOLOv4 and Scaled-YOLOv4)	  
-                const float bx = x + scale_x_y * detections[bbindex] - offset;
-                const float by = y + scale_x_y * detections[bbindex + numGridCells] - offset;
-                const float bw = pw * std::pow(detections[bbindex + 2 * numGridCells] * 2, 2);
-                const float bh = ph * std::pow(detections[bbindex + 3 * numGridCells] * 2, 2);
+                const float bx = x + scale_x_y * __half2float(detections[bbindex]) - offset;
+                const float by = y + scale_x_y * __half2float(detections[bbindex + numGridCells]) - offset;
+                const float bw = pw * std::pow(__half2float(detections[bbindex + 2 * numGridCells]) * 2, 2);
+                const float bh = ph * std::pow(__half2float(detections[bbindex + 3 * numGridCells]) * 2, 2);
 
                 // Decode class probabilities.
                 float maxProb = 0.0f;
                 int maxIndex = -1;
                 for (int i = 0; i < num_class_; ++i)
                 {
-                    float prob = detections[bbindex + (5 + i) * numGridCells];
+                    float prob = __half2float(detections[bbindex + (5 + i) * numGridCells]);
                     if (prob > maxProb)
                     {
                         maxProb = prob;
