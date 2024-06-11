@@ -70,7 +70,7 @@ class cuDLAContextStandalone
     //!
     //! \brief Construct infer context from loadable
     //!
-    cuDLAContextStandalone(const char *loadableFilePath);
+    cuDLAContextStandalone(const char *loadableFilePath, const int dla_id);
 
     //!
     //! \brief Deconstructor
@@ -172,6 +172,7 @@ class cuDLAContextStandalone
     uint64_t m_WaiterValue = 0;
 #endif
     cudlaTask m_Task;
+    int m_dla_id;
 };
 
 #endif
