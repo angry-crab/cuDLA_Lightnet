@@ -151,7 +151,7 @@ public:
 
   std::vector<float> input_h_;
 
-  std::vector<std::vector<float>> output_h_;
+  std::vector<std::vector<__half>> output_h_;
 
   std::vector<int> input_dims;
   std::vector<int> output_dims_0;
